@@ -48,7 +48,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
-from .drf_conf import REST_FRAMEWORK, SIMPLE_JWT
+from .drf_conf import REST_FRAMEWORK, SIMPLE_JWT, SWAGGER_SETTINGS
 
 
 MIDDLEWARE = [

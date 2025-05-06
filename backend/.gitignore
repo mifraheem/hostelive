@@ -9,3 +9,7 @@ wheels/
 # Virtual environments
 .venv
 *.pyc
+migrations/
+db.sqlite3
+# IDE files
+.idea/

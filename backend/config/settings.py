@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from .jazzmin_conf import JAZZMIN_SETTINGS
 from pathlib import Path
-from .drf_conf import REST_FRAMEWORK, SIMPLE_JWT
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -49,6 +48,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+from .drf_conf import REST_FRAMEWORK, SIMPLE_JWT
 
 
 MIDDLEWARE = [

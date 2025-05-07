@@ -32,7 +32,7 @@ class Property(models.Model):
         SharedFacility, blank=True, related_name='properties')
 
     def __str__(self):
-        return f"{self.name} ({self.type.name})"
+        return f"{self.title} ({self.type.name})"
 
 class RoomFacility(models.Model):
     name = models.CharField(max_length=100, unique=True)

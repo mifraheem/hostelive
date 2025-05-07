@@ -1,11 +1,6 @@
 from rest_framework import serializers
 from ..models import Property, SharedFacility
-
-class SharedFacilitySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SharedFacility
-        fields = ['id', 'name']
-
+from .facilities import SharedFacilitySerializer
 class PropertySerializer(serializers.ModelSerializer):
     shared_facilities = serializers.PrimaryKeyRelatedField(
         queryset=SharedFacility.objects.all(),
@@ -15,15 +10,15 @@ class PropertySerializer(serializers.ModelSerializer):
     shared_facilities_detail = SharedFacilitySerializer(
         source='shared_facilities',
         many=True,
-        read_only=True     # ✅ shown in responses
+        read_only=True    
     )
 
     class Meta:
         model = Property
         fields = [
             'id', 'type', 'title', 'address', 'city', 'description',
-            'shared_facilities',        # input
-            'shared_facilities_detail', # output
+            'shared_facilities',       
+            'shared_facilities_detail',
             'is_active', 'created_at'
         ]
         read_only_fields = ['id', 'owner', 'created_at']

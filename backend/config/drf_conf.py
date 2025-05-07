@@ -8,6 +8,8 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'utils.renderers.CustomRenderer',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'utils.pagination.StandardResultsSetPagination',
+    'PAGE_SIZE': 10,
     # You might want to add pagination, filtering, etc. here
 }
 

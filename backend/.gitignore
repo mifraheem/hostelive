@@ -13,3 +13,4 @@ migrations/
 db.sqlite3
 # IDE files
 .idea/
+env

@@ -48,6 +48,8 @@ class Room(models.Model):
     capacity = models.PositiveIntegerField()
     rent_per_month = models.DecimalField(max_digits=8, decimal_places=2)
     is_available = models.BooleanField(default=True)
+    facilities = models.ManyToManyField(RoomFacility, blank=True, related_name='rooms')
+
 
     def __str__(self):
         return f"{self.property.title} - Room {self.room_number}"

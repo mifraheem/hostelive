@@ -2,8 +2,10 @@ from rest_framework import viewsets, permissions
 from ..models import Property
 from ..serializers.property import PropertySerializer
 from ..permissions import IsOwnerOrReadOnly
+from drf_yasg.utils import swagger_auto_schema
 
 class PropertyViewSet(viewsets.ModelViewSet):
+    
     serializer_class = PropertySerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
 

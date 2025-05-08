@@ -5,7 +5,7 @@ class PropertySerializer(serializers.ModelSerializer):
     shared_facilities = serializers.PrimaryKeyRelatedField(
         queryset=SharedFacility.objects.all(),
         many=True,
-        write_only=True  # ✅ only used when sending data
+        write_only=True
     )
     shared_facilities_detail = SharedFacilitySerializer(
         source='shared_facilities',

@@ -6,10 +6,12 @@ from .apis.facilities import (
     SharedFacilityListCreateView,
 )
 from .apis.property import PropertyViewSet
+from .apis.rooms import RoomViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register(r'properties', PropertyViewSet, basename='property')
+router.register(r'rooms', RoomViewSet, basename='room')
 
 
 urlpatterns = [

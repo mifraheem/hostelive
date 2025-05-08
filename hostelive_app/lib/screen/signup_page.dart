@@ -47,21 +47,28 @@ class _SignupPageState extends State<SignupPage> {
 
       print('Request body: $requestBody');
 
+      // FIX 1: Check if the API endpoint URL is correct
+      // Try without the trailing slash or with a different path
       final response = await http
           .post(
-            Uri.parse('http://10.0.2.2:8000/auth/register/'),
+            Uri.parse(
+              'http://10.0.2.2:8000/api/auth/register/',
+            ), // Modified URL
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
             body: requestBody,
           )
-          .timeout(
-            const Duration(seconds: 15),
-          ); // Add timeout to detect connection issues
+          .timeout(const Duration(seconds: 15));
 
       print('Response status code: ${response.statusCode}');
       print('Response body: ${response.body}');
+
+      // FIX 2: Handle different status codes appropriately
+      if (response.statusCode == 404) {
+        throw Exception('API endpoint not found. Please check the server URL.');
+      }
 
       // Try to parse the response body
       final Map<String, dynamic> responseData;
@@ -73,7 +80,8 @@ class _SignupPageState extends State<SignupPage> {
         throw Exception('Invalid response format from server');
       }
 
-      if (responseData['success'] == true) {
+      // FIX 3: Make response parsing more resilient
+      if (response.statusCode == 201 || response.statusCode == 200) {
         // Registration successful
         if (!mounted) return;
 
@@ -87,14 +95,21 @@ class _SignupPageState extends State<SignupPage> {
         // Navigate to login page
         Navigator.pushNamed(context, '/login');
       } else {
-        // Handle validation errors
+        // Handle errors based on your API's error response format
         setState(() {
-          _errorMessage = responseData['message'];
+          _errorMessage =
+              responseData['message'] ??
+              responseData['detail'] ??
+              'Registration failed. Please try again.';
+
+          // Handle field-specific errors if they exist
           if (responseData['errors'] != null) {
             final errors = responseData['errors'] as Map<String, dynamic>;
             errors.forEach((key, value) {
               if (value is List) {
                 _fieldErrors[key] = List<String>.from(value);
+              } else if (value is String) {
+                _fieldErrors[key] = [value];
               }
             });
           }
@@ -104,7 +119,7 @@ class _SignupPageState extends State<SignupPage> {
       print('Error during registration: $error');
       setState(() {
         _errorMessage =
-            'Failed to connect to server. Please try again later. Error: $error';
+            'Failed to connect to server. Please check your connection and try again.';
       });
     } finally {
       if (mounted) {
@@ -312,52 +327,6 @@ class _SignupPageState extends State<SignupPage> {
                   ),
                 ),
 
-                const Center(child: Text("Or")),
-
-                // Google sign-in button
-                Container(
-                  height: 45,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(color: Colors.purple),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.5),
-                        spreadRadius: 1,
-                        blurRadius: 1,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: TextButton(
-                    onPressed: () {},
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          height: 30.0,
-                          width: 30.0,
-                          // decoration: const BoxDecoration(
-                          //   image: DecorationImage(
-                          //     image: AssetImage(
-                          //       'assets/images/login_signup/google.png',
-                          //     ),
-                          //     fit: BoxFit.cover,
-                          //   ),
-                          //   shape: BoxShape.circle,
-                          // ),
-                        ),
-                        const SizedBox(width: 18),
-                        const Text(
-                          "Sign In with Google",
-                          style: TextStyle(fontSize: 16, color: Colors.purple),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Login redirect
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[

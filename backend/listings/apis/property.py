@@ -3,11 +3,14 @@ from ..models import Property
 from ..serializers.property import PropertySerializer
 from ..permissions import IsOwnerOrReadOnly
 from drf_yasg.utils import swagger_auto_schema
+from rest_framework.parsers import MultiPartParser, FormParser
+
 
 class PropertyViewSet(viewsets.ModelViewSet):
     
     serializer_class = PropertySerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser] 
 
     def get_queryset(self):
         base_qs = Property.objects.all().order_by('-created_at')

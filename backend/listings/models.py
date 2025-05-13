@@ -30,6 +30,7 @@ class Property(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     shared_facilities = models.ManyToManyField(
         SharedFacility, blank=True, related_name='properties')
+    thumbnail = models.ImageField(upload_to='property_thumbnails/', blank=True, null=True)
 
     def __str__(self):
         return f"{self.title} ({self.type.name})"
@@ -49,6 +50,8 @@ class Room(models.Model):
     rent_per_month = models.DecimalField(max_digits=8, decimal_places=2)
     is_available = models.BooleanField(default=True)
     facilities = models.ManyToManyField(RoomFacility, blank=True, related_name='rooms')
+    thumbnail = models.ImageField(upload_to='room_thumbnails/', blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
     def __str__(self):

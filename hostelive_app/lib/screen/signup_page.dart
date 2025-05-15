@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hostelive_app/constant.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -33,27 +34,15 @@ class _SignupPageState extends State<SignupPage> {
     });
 
     try {
-      // Debug print before making the request
-      print('Making API request to register user');
-      print('Username: ${_usernameController.text}');
-      print('Email: ${_emailController.text}');
-
-      // Create the request body first
       final requestBody = json.encode({
         'username': _usernameController.text,
         'email': _emailController.text,
         'password': _passwordController.text,
       });
 
-      print('Request body: $requestBody');
-
-      // FIX 1: Check if the API endpoint URL is correct
-      // Try without the trailing slash or with a different path
       final response = await http
           .post(
-            Uri.parse(
-              'http://10.0.2.2:8000/api/auth/register/',
-            ), // Modified URL
+            Uri.parse('$baseUrl/api/auth/register/'),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
@@ -62,25 +51,14 @@ class _SignupPageState extends State<SignupPage> {
           )
           .timeout(const Duration(seconds: 15));
 
-      print('Response status code: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
-      // FIX 2: Handle different status codes appropriately
-      if (response.statusCode == 404) {
-        throw Exception('API endpoint not found. Please check the server URL.');
-      }
-
       // Try to parse the response body
       final Map<String, dynamic> responseData;
       try {
         responseData = json.decode(response.body);
-        print('Parsed response data: $responseData');
       } catch (e) {
-        print('Error parsing response: $e');
         throw Exception('Invalid response format from server');
       }
 
-      // FIX 3: Make response parsing more resilient
       if (response.statusCode == 201 || response.statusCode == 200) {
         // Registration successful
         if (!mounted) return;
@@ -94,32 +72,51 @@ class _SignupPageState extends State<SignupPage> {
 
         // Navigate to login page
         Navigator.pushNamed(context, '/login');
+      } else if (response.statusCode == 400) {
+        // Handle validation errors specifically
+        setState(() {
+          // Process field-specific errors
+          responseData.forEach((key, value) {
+            if (value is List) {
+              _fieldErrors[key] = List<String>.from(value);
+            } else if (value is String) {
+              _fieldErrors[key] = [value];
+            }
+          });
+
+          // Set a general error message based on field errors
+          if (_fieldErrors.containsKey('username') &&
+              _fieldErrors.containsKey('email')) {
+            _errorMessage = 'Both username and email are already taken.';
+          } else if (_fieldErrors.containsKey('username')) {
+            _errorMessage = 'This username is already taken.';
+          } else if (_fieldErrors.containsKey('email')) {
+            _errorMessage = 'This email is already registered.';
+          } else {
+            _errorMessage = 'Please correct the errors above and try again.';
+          }
+        });
       } else {
-        // Handle errors based on your API's error response format
+        // Handle other error statuses
         setState(() {
           _errorMessage =
               responseData['message'] ??
               responseData['detail'] ??
-              'Registration failed. Please try again.';
-
-          // Handle field-specific errors if they exist
-          if (responseData['errors'] != null) {
-            final errors = responseData['errors'] as Map<String, dynamic>;
-            errors.forEach((key, value) {
-              if (value is List) {
-                _fieldErrors[key] = List<String>.from(value);
-              } else if (value is String) {
-                _fieldErrors[key] = [value];
-              }
-            });
-          }
+              'Registration failed. Please try again later.';
         });
       }
     } catch (error) {
-      print('Error during registration: $error');
       setState(() {
-        _errorMessage =
-            'Failed to connect to server. Please check your connection and try again.';
+        if (error.toString().contains('timeout')) {
+          _errorMessage =
+              'Request timed out. Please check your connection and try again.';
+        } else if (error.toString().contains('SocketException')) {
+          _errorMessage =
+              'Cannot connect to the server. Please check your internet connection.';
+        } else {
+          _errorMessage =
+              'An unexpected error occurred. Please try again later.';
+        }
       });
     } finally {
       if (mounted) {
@@ -135,6 +132,7 @@ class _SignupPageState extends State<SignupPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign Up'),
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.purple,
       ),
       body: SingleChildScrollView(
@@ -176,13 +174,18 @@ class _SignupPageState extends State<SignupPage> {
                           borderRadius: BorderRadius.circular(18),
                           borderSide: BorderSide.none,
                         ),
-                        fillColor: Colors.purple.withOpacity(0.1),
+                        fillColor:
+                            _fieldErrors['username'] != null
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.purple.withOpacity(0.1),
                         filled: true,
-                        prefixIcon: const Icon(Icons.person),
-                        errorText:
-                            _fieldErrors['username']?.isNotEmpty == true
-                                ? _fieldErrors['username']!.first
-                                : null,
+                        prefixIcon: Icon(
+                          Icons.person,
+                          color:
+                              _fieldErrors['username'] != null
+                                  ? Colors.red
+                                  : null,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -191,6 +194,18 @@ class _SignupPageState extends State<SignupPage> {
                         return null;
                       },
                     ),
+
+                    if (_fieldErrors['username'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5, left: 12),
+                        child: Text(
+                          _fieldErrors['username']!.first,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
 
                     const SizedBox(height: 20),
 
@@ -204,13 +219,16 @@ class _SignupPageState extends State<SignupPage> {
                           borderRadius: BorderRadius.circular(18),
                           borderSide: BorderSide.none,
                         ),
-                        fillColor: Colors.purple.withOpacity(0.1),
+                        fillColor:
+                            _fieldErrors['email'] != null
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.purple.withOpacity(0.1),
                         filled: true,
-                        prefixIcon: const Icon(Icons.email),
-                        errorText:
-                            _fieldErrors['email']?.isNotEmpty == true
-                                ? _fieldErrors['email']!.first
-                                : null,
+                        prefixIcon: Icon(
+                          Icons.email,
+                          color:
+                              _fieldErrors['email'] != null ? Colors.red : null,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -225,6 +243,18 @@ class _SignupPageState extends State<SignupPage> {
                       },
                     ),
 
+                    if (_fieldErrors['email'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5, left: 12),
+                        child: Text(
+                          _fieldErrors['email']!.first,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+
                     const SizedBox(height: 20),
 
                     // Password field
@@ -236,13 +266,18 @@ class _SignupPageState extends State<SignupPage> {
                           borderRadius: BorderRadius.circular(18),
                           borderSide: BorderSide.none,
                         ),
-                        fillColor: Colors.purple.withOpacity(0.1),
+                        fillColor:
+                            _fieldErrors['password'] != null
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.purple.withOpacity(0.1),
                         filled: true,
-                        prefixIcon: const Icon(Icons.password),
-                        errorText:
-                            _fieldErrors['password']?.isNotEmpty == true
-                                ? _fieldErrors['password']!.first
-                                : null,
+                        prefixIcon: Icon(
+                          Icons.password,
+                          color:
+                              _fieldErrors['password'] != null
+                                  ? Colors.red
+                                  : null,
+                        ),
                       ),
                       obscureText: true,
                       validator: (value) {
@@ -255,6 +290,18 @@ class _SignupPageState extends State<SignupPage> {
                         return null;
                       },
                     ),
+
+                    if (_fieldErrors['password'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5, left: 12),
+                        child: Text(
+                          _fieldErrors['password']!.first,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
 
                     const SizedBox(height: 20),
 
@@ -285,14 +332,27 @@ class _SignupPageState extends State<SignupPage> {
                   ],
                 ),
 
-                // Error message display
+                // General error message display
                 if (_errorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10, bottom: 10),
-                    child: Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 

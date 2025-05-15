@@ -1,0 +1,650 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hostelive_app/constant.dart';
+import 'package:http/http.dart' as http;
+import 'package:multi_select_flutter/multi_select_flutter.dart';
+
+class AddPropertyPage extends StatefulWidget {
+  const AddPropertyPage({super.key});
+
+  @override
+  _AddPropertyPageState createState() => _AddPropertyPageState();
+}
+
+class _AddPropertyPageState extends State<AddPropertyPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _newTypeController = TextEditingController();
+  final _newFacilityController = TextEditingController();
+
+  int? _propertyType;
+  bool _isActive = true;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  List<Map<String, dynamic>> _propertyTypes = [];
+  List<Map<String, dynamic>> _facilityOptions = [];
+
+  final _storage = const FlutterSecureStorage();
+  final String _baseUrl = '$baseUrl';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPropertyTypes();
+    _fetchFacilities();
+  }
+
+  Future<String?> _getToken() async {
+    return await _storage.read(key: 'access_token');
+  }
+
+  Future<void> _fetchPropertyTypes() async {
+    try {
+      String? token = await _getToken();
+      if (token == null) {
+        setState(() {
+          _errorMessage = 'Not authenticated. Please log in.';
+        });
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/listings/types/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _propertyTypes = List<Map<String, dynamic>>.from(
+            data.map((x) => {'id': x['id'], 'name': x['name']}),
+          );
+          if (_propertyTypes.isNotEmpty && _propertyType == null) {
+            _propertyType = _propertyTypes.first['id'];
+          }
+        });
+      } else if (response.statusCode == 401) {
+        Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        setState(() {
+          _errorMessage =
+              'Failed to fetch property types: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to fetch property types: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _fetchFacilities() async {
+    try {
+      String? token = await _getToken();
+      if (token == null) {
+        setState(() {
+          _errorMessage = 'Not authenticated. Please log in.';
+        });
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/listings/shared-facilities/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _facilityOptions = List<Map<String, dynamic>>.from(
+            data.map((x) => {'id': x['id'], 'name': x['name']}),
+          );
+        });
+      } else if (response.statusCode == 401) {
+        Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to fetch facilities: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to fetch facilities: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _addNewType() async {
+    if (_newTypeController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a property type name.';
+      });
+      return;
+    }
+
+    try {
+      String? token = await _getToken();
+      if (token == null) {
+        setState(() {
+          _errorMessage = 'Not authenticated. Please log in.';
+        });
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/listings/types/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'name': _newTypeController.text}),
+      );
+      if (response.statusCode == 201) {
+        _newTypeController.clear();
+        _fetchPropertyTypes();
+      } else if (response.statusCode == 401) {
+        Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to add property type: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Network error: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _addNewFacility() async {
+    if (_newFacilityController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a facility name.';
+      });
+      return;
+    }
+
+    try {
+      String? token = await _getToken();
+      if (token == null) {
+        setState(() {
+          _errorMessage = 'Not authenticated. Please log in.';
+        });
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/listings/shared-facilities/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'name': _newFacilityController.text}),
+      );
+      if (response.statusCode == 201) {
+        _newFacilityController.clear();
+        _fetchFacilities();
+      } else if (response.statusCode == 401) {
+        Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to add facility: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Network error: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _saveProperty() async {
+    if (_formKey.currentState == null ||
+        !_formKey.currentState!.validate() ||
+        _propertyType == null) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      String? token = await _getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      List<int> selectedFacilities =
+          _facilityOptions
+              .where((facility) => facility['selected'] == true)
+              .map((facility) => facility['id'] as int)
+              .toList();
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/listings/properties/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'type': _propertyType,
+          'title': _titleController.text,
+          'address': _addressController.text,
+          'city': _cityController.text,
+          'shared_facilities': selectedFacilities,
+          'description': _descriptionController.text,
+          'is_active': _isActive,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Property added successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      } else if (response.statusCode == 400) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        setState(() {
+          _errorMessage = 'Please fix the following errors:';
+          for (var entry in responseData.entries) {
+            if (entry.value is List) {
+              _errorMessage =
+                  '$_errorMessage\n• ${entry.key}: ${entry.value.join(', ')}';
+            } else {
+              _errorMessage = '$_errorMessage\n• ${entry.key}: ${entry.value}';
+            }
+          }
+        });
+      } else if (response.statusCode == 401) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to add property. Please try again later.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Network error: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Add Property'),
+        backgroundColor: Colors.purple,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Property Details',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+
+                // Property Type
+                const Text(
+                  'Property Type',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  value: _propertyType,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.purple.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  items:
+                      _propertyTypes.map((type) {
+                        return DropdownMenuItem<int>(
+                          value: type['id'],
+                          child: Text(type['name']),
+                        );
+                      }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _propertyType = value;
+                    });
+                  },
+                  validator:
+                      (value) =>
+                          value == null
+                              ? 'Please select a property type'
+                              : null,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _newTypeController,
+                        decoration: InputDecoration(
+                          labelText: 'New Property Type',
+                          hintText: 'Enter new type',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          fillColor: Colors.purple.withOpacity(0.1),
+                          filled: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _addNewType,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                      ),
+                      child: const Text(
+                        'Add',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                TextFormField(
+                  controller: _titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Property Title',
+                    hintText: 'Enter property name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
+                    fillColor: Colors.purple.withOpacity(0.1),
+                    filled: true,
+                    prefixIcon: const Icon(Icons.title),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a title';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Address
+                TextFormField(
+                  controller: _addressController,
+                  decoration: InputDecoration(
+                    labelText: 'Address',
+                    hintText: 'Enter property address',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
+                    fillColor: Colors.purple.withOpacity(0.1),
+                    filled: true,
+                    prefixIcon: const Icon(Icons.location_on),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter an address';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // City
+                TextFormField(
+                  controller: _cityController,
+                  decoration: InputDecoration(
+                    labelText: 'City',
+                    hintText: 'Enter city name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
+                    fillColor: Colors.purple.withOpacity(0.1),
+                    filled: true,
+                    prefixIcon: const Icon(Icons.location_city),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a city';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Facilities
+                const Text(
+                  'Facilities',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                MultiSelectDialogField(
+                  items:
+                      _facilityOptions
+                          .map(
+                            (facility) => MultiSelectItem<Map<String, dynamic>>(
+                              facility,
+                              facility['name'],
+                            ),
+                          )
+                          .toList(),
+                  title: const Text('Select Facilities'),
+                  selectedColor: Colors.purple,
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  buttonText: const Text(
+                    'Select Facilities',
+                    style: TextStyle(color: Colors.purple),
+                  ),
+                  buttonIcon: const Icon(
+                    Icons.arrow_drop_down,
+                    color: Colors.purple,
+                  ),
+                  onConfirm: (selected) {
+                    setState(() {
+                      // Reset all facilities to unselected
+                      for (var facility in _facilityOptions) {
+                        facility['selected'] = false;
+                      }
+                      // Mark selected facilities
+                      for (var selectedFacility
+                          in selected.cast<Map<String, dynamic>>()) {
+                        var facility = _facilityOptions.firstWhere(
+                          (f) => f['id'] == selectedFacility['id'],
+                        );
+                        facility['selected'] = true;
+                      }
+                    });
+                  },
+                  chipDisplay: MultiSelectChipDisplay(
+                    chipColor: Colors.purple.withOpacity(0.2),
+                    textStyle: const TextStyle(color: Colors.purple),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _newFacilityController,
+                        decoration: InputDecoration(
+                          labelText: 'New Facility',
+                          hintText: 'Enter new facility',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          fillColor: Colors.purple.withOpacity(0.1),
+                          filled: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _addNewFacility,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                      ),
+                      child: const Text(
+                        'Add',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Description
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Enter property description',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
+                    fillColor: Colors.purple.withOpacity(0.1),
+                    filled: true,
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 5,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a description';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Status Switch
+                SwitchListTile(
+                  title: const Text('Property Status'),
+                  subtitle: Text(_isActive ? 'Active' : 'Inactive'),
+                  value: _isActive,
+                  activeColor: Colors.purple,
+                  onChanged: (bool value) {
+                    setState(() {
+                      _isActive = value;
+                    });
+                  },
+                ),
+
+                // Error message display
+                if (_errorMessage != null)
+                  Container(
+                    margin: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 24),
+
+                // Save button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _saveProperty,
+                    style: ElevatedButton.styleFrom(
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: Colors.purple,
+                      disabledBackgroundColor: Colors.purple.withOpacity(0.5),
+                    ),
+                    child:
+                        _isLoading
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                            : const Text(
+                              "Save Property",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _descriptionController.dispose();
+    _newTypeController.dispose();
+    _newFacilityController.dispose();
+    super.dispose();
+  }
+}

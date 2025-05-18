@@ -7,11 +7,13 @@ from .apis.facilities import (
 )
 from .apis.property import PropertyViewSet
 from .apis.rooms import RoomViewSet
+from .apis.feedback import FeedbackViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register(r'properties', PropertyViewSet, basename='property')
 router.register(r'rooms', RoomViewSet, basename='room')
+router.register(r'feedbacks', FeedbackViewSet, basename='feedbacks')
 
 
 urlpatterns = [

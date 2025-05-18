@@ -12,4 +12,5 @@ dependencies = [
     "djangorestframework-simplejwt>=5.5.0",
     "drf-yasg>=1.21.10",
     "pillow>=11.2.1",
+    "vadersentiment>=3.3.2",
 ]

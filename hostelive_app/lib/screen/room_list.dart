@@ -107,7 +107,7 @@ class RoomsListWidgetState extends State<RoomsListWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Room availability updated'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFFE6C871),
           ),
         );
       } else {
@@ -116,7 +116,7 @@ class RoomsListWidgetState extends State<RoomsListWidget> {
             content: Text(
               'Failed to update room availability: ${response.statusCode}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFE6C871),
           ),
         );
       }
@@ -124,7 +124,7 @@ class RoomsListWidgetState extends State<RoomsListWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          backgroundColor: const Color(0xFFE6C871),
         ),
       );
     }
@@ -137,28 +137,32 @@ class RoomsListWidgetState extends State<RoomsListWidget> {
       child:
           _isLoading
               ? const Center(
-                child: CircularProgressIndicator(color: Colors.purple),
+                child: CircularProgressIndicator(color: Color(0xFF3B5A7A)),
               )
               : _errorMessage != null
               ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
+                    Icon(
+                      Icons.error_outline,
+                      size: 60,
+                      color: const Color(0xFFE6C871),
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Error loading rooms',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.red[700],
+                        color: const Color(0xFF3B5A7A),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       _errorMessage!,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.red[700]),
+                      style: TextStyle(color: const Color(0xFF3B5A7A)),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
@@ -166,8 +170,8 @@ class RoomsListWidgetState extends State<RoomsListWidget> {
                       icon: const Icon(Icons.refresh),
                       label: const Text('Try Again'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
-                        foregroundColor: Colors.white,
+                        backgroundColor: const Color(0xFFE6C871),
+                        foregroundColor: const Color(0xFF3B5A7A),
                       ),
                     ),
                   ],
@@ -201,93 +205,207 @@ class RoomsListWidgetState extends State<RoomsListWidget> {
                 itemCount: _rooms.length,
                 itemBuilder: (context, index) {
                   final room = _rooms[index];
-                  return Card(
-                    elevation: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.purple.shade50,
-                        radius: 25,
-                        child: Icon(
-                          Icons.meeting_room,
-                          color: Colors.purple,
-                          size: 30,
-                        ),
-                      ),
-                      title: Text(
-                        'Room ${room['room_number'] ?? 'Unknown'}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Text(
-                            'Type: ${room['room_type'] ?? 'Unknown'}',
-                            style: TextStyle(color: Colors.grey[600]),
+                  return TweenAnimationBuilder(
+                    duration: const Duration(milliseconds: 300),
+                    tween: Tween<double>(begin: 0, end: 1),
+                    builder: (context, opacity, child) {
+                      return Opacity(opacity: opacity, child: child);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: InkWell(
+                        onTap: () {
+                          // TODO: Navigate to room details (if needed)
+                        },
+                        borderRadius: BorderRadius.circular(15),
+                        splashColor: const Color(0xFFE6C871).withOpacity(0.2),
+                        child: Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            side: BorderSide(
+                              color: const Color(0xFFE6C871).withOpacity(0.3),
+                              width: 1,
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Capacity: ${room['capacity'] ?? 'Unknown'}',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Rent: \$${room['rent_per_month'] ?? 'Unknown'}/month',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
+                          child: Stack(
                             children: [
-                              Icon(
-                                room['is_available'] == true
-                                    ? Icons.check_circle
-                                    : Icons.cancel,
-                                size: 16,
-                                color:
-                                    room['is_available'] == true
-                                        ? Colors.green
-                                        : Colors.red,
+                              Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Thumbnail
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Container(
+                                        width: 50,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFFE6C871,
+                                          ).withOpacity(0.3),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(
+                                                0xFF3B5A7A,
+                                              ).withOpacity(0.1),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child:
+                                            room['thumbnail'] != null &&
+                                                    room['thumbnail'].isNotEmpty
+                                                ? Image.network(
+                                                  room['thumbnail'],
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (
+                                                    context,
+                                                    error,
+                                                    stackTrace,
+                                                  ) {
+                                                    return const Center(
+                                                      child: Icon(
+                                                        Icons.meeting_room,
+                                                        size: 30,
+                                                        color: Color(
+                                                          0xFF3B5A7A,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                )
+                                                : const Center(
+                                                  child: Icon(
+                                                    Icons.meeting_room,
+                                                    size: 30,
+                                                    color: Color(0xFF3B5A7A),
+                                                  ),
+                                                ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    // Details
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Room ${room['room_number'] ?? 'Unknown'}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 20,
+                                              color: Color(0xFF3B5A7A),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Type: ${room['room_type'] ?? 'Unknown'}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Capacity: ${room['capacity'] ?? 'Unknown'}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Rent: \$${room['rent_per_month'] ?? 'Unknown'}/month',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                room['is_available'] == true
-                                    ? 'Available'
-                                    : 'Unavailable',
-                                style: TextStyle(
-                                  color:
-                                      room['is_available'] == true
-                                          ? Colors.green
-                                          : Colors.red,
+                              // Status Badge
+                              Positioned(
+                                top: 10,
+                                right: 20,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        room['is_available'] == true
+                                            ? Colors.green.withOpacity(0.1)
+                                            : Colors.red.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(
+                                        0xFFE6C871,
+                                      ).withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    room['is_available'] == true
+                                        ? 'Available'
+                                        : 'Unavailable',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color:
+                                          room['is_available'] == true
+                                              ? Colors.green
+                                              : Colors.red,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Toggle Button
+                              Positioned(
+                                top: 0,
+                                bottom: 0,
+                                right: 20,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: const Color(
+                                        0xFFE6C871,
+                                      ).withOpacity(0.1),
+                                    ),
+                                    child: IconButton(
+                                      icon: Icon(
+                                        room['is_available'] == true
+                                            ? Icons.no_accounts
+                                            : Icons.check_circle_outline,
+                                        size: 20,
+                                        color: const Color(0xFFE6C871),
+                                      ),
+                                      onPressed: () {
+                                        _toggleRoomAvailability(
+                                          room['id'],
+                                          room['is_available'] == true,
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      trailing: IconButton(
-                        icon: Icon(
-                          room['is_available'] == true
-                              ? Icons.no_accounts
-                              : Icons.check_circle_outline,
-                          color:
-                              room['is_available'] == true
-                                  ? Colors.red
-                                  : Colors.green,
                         ),
-                        onPressed: () {
-                          _toggleRoomAvailability(
-                            room['id'],
-                            room['is_available'] == true,
-                          );
-                        },
                       ),
                     ),
                   );

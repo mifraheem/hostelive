@@ -16,17 +16,25 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String username = 'Unknown User';
   String? errorMessage;
+  String _errorMessage = '';
   bool isLoading = true;
   final _storage = const FlutterSecureStorage();
   int _selectedIndex = 0;
   List<Map<String, dynamic>> _properties = [];
+  List<Map<String, dynamic>> _feedbacks = [];
   bool _isLoadingProperties = false;
+  bool _isLoadingFeedbacks = false;
+  int _totalFeedbackCount = 0; // Store total feedback count separately
 
   @override
   void initState() {
     super.initState();
     _fetchUsername();
     _fetchProperties();
+  }
+
+  Future<String?> _loadToken() async {
+    return await _storage.read(key: 'access_token');
   }
 
   Future<void> _fetchUsername() async {
@@ -108,6 +116,17 @@ class _HomePageState extends State<HomePage> {
             _properties = List<Map<String, dynamic>>.from(data);
             _isLoadingProperties = false;
           });
+
+          // Debug: Print properties to check if they have IDs
+          print('Properties loaded: ${_properties.length}');
+          for (var property in _properties) {
+            print(
+              'Property ID: ${property['id']}, Name: ${property['name'] ?? property['title']}',
+            );
+          }
+
+          // After properties are loaded, fetch total feedbacks count
+          _fetchTotalFeedbacksCount();
         } else if (response.statusCode == 401) {
           await _logout();
         } else {
@@ -119,7 +138,7 @@ class _HomePageState extends State<HomePage> {
               content: Text(
                 'Failed to load properties: ${response.statusCode}',
               ),
-              backgroundColor: Colors.red,
+              backgroundColor: const Color(0xFFE6C871),
             ),
           );
         }
@@ -131,9 +150,161 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          backgroundColor: const Color(0xFFE6C871),
         ),
       );
+    }
+  }
+
+  // Updated method to fetch total feedbacks count with better error handling
+  Future<void> _fetchTotalFeedbacksCount() async {
+    if (_properties.isEmpty) {
+      setState(() {
+        _totalFeedbackCount = 0;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingFeedbacks = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final token = await _loadToken();
+      if (token == null) {
+        throw Exception('No authentication token available');
+      }
+
+      int totalCount = 0;
+
+      // Try different API endpoints to find the correct one
+      for (var property in _properties) {
+        final propertyId = property['id'];
+        if (propertyId == null) continue;
+
+        try {
+          // Try the property-specific endpoint first
+          var response = await http.get(
+            Uri.parse('$baseUrl/api/listings/feedbacks/property/$propertyId/'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          );
+
+          print(
+            'Feedback API Response for property $propertyId: ${response.statusCode}',
+          );
+          print('Response body: ${response.body}');
+
+          if (response.statusCode == 200) {
+            final List<dynamic> data = jsonDecode(response.body);
+            totalCount += data.length;
+            print('Found ${data.length} feedbacks for property $propertyId');
+          } else if (response.statusCode == 404) {
+            // If property-specific endpoint doesn't exist, try general endpoint
+            print(
+              'Property-specific endpoint not found, trying general endpoint',
+            );
+            response = await http.get(
+              Uri.parse(
+                '$baseUrl/api/listings/feedbacks/?property_id=$propertyId',
+              ),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+            );
+
+            if (response.statusCode == 200) {
+              final data = jsonDecode(response.body);
+              if (data is List) {
+                totalCount += data.length;
+              } else if (data is Map && data['results'] != null) {
+                totalCount += (data['results'] as List).length;
+              }
+            }
+          } else {
+            print(
+              'Failed to fetch feedbacks for property $propertyId: ${response.statusCode}',
+            );
+          }
+        } catch (e) {
+          print('Error fetching feedbacks for property $propertyId: $e');
+        }
+      }
+
+      setState(() {
+        _totalFeedbackCount = totalCount;
+        _isLoadingFeedbacks = false;
+      });
+
+      print('Total feedbacks count: $totalCount');
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading feedbacks: $e';
+        _isLoadingFeedbacks = false;
+        _totalFeedbackCount = 0;
+      });
+      print('Error in _fetchTotalFeedbacksCount: $e');
+    }
+  }
+
+  // Alternative method to fetch all feedbacks at once (if API supports it)
+  Future<void> _fetchAllFeedbacks() async {
+    setState(() {
+      _isLoadingFeedbacks = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final token = await _loadToken();
+      if (token == null) {
+        throw Exception('No authentication token available');
+      }
+
+      // Try to fetch all feedbacks for the user
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/listings/feedbacks/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('All feedbacks API Response: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        List<dynamic> feedbacksList = [];
+
+        if (data is List) {
+          feedbacksList = data;
+        } else if (data is Map && data['results'] != null) {
+          feedbacksList = data['results'];
+        }
+
+        setState(() {
+          _feedbacks = List<Map<String, dynamic>>.from(feedbacksList);
+          _totalFeedbackCount = _feedbacks.length;
+          _isLoadingFeedbacks = false;
+        });
+
+        print('Total feedbacks loaded: ${_feedbacks.length}');
+      } else {
+        throw Exception(
+          'Failed to load feedbacks: ${response.statusCode} ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading feedbacks: $e';
+        _isLoadingFeedbacks = false;
+        _totalFeedbackCount = 0;
+      });
+      print('Error in _fetchAllFeedbacks: $e');
     }
   }
 
@@ -155,19 +326,31 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Hostelive',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Hostelive',
+              style: TextStyle(
+                color: Color(0xFFE6C871),
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.purple,
+        backgroundColor: const Color(0xFF3B5A7A),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Color(0xFFE6C871)),
             onPressed: () {
               _fetchUsername();
               _fetchProperties();
+              // Try alternative method if the first one doesn't work
+              _fetchAllFeedbacks();
             },
           ),
         ],
@@ -175,7 +358,7 @@ class _HomePageState extends State<HomePage> {
       body:
           isLoading
               ? const Center(
-                child: CircularProgressIndicator(color: Colors.purple),
+                child: CircularProgressIndicator(color: Color(0xFF3B5A7A)),
               )
               : _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
@@ -188,14 +371,16 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.purple,
+        selectedItemColor: const Color(0xFF3B5A7A),
+        unselectedItemColor: Colors.grey[600],
+        backgroundColor: Colors.white,
         onTap: _onItemTapped,
       ),
       floatingActionButton:
           _selectedIndex == 1
               ? FloatingActionButton(
-                backgroundColor: Colors.purple,
-                child: const Icon(Icons.add),
+                backgroundColor: const Color(0xFFE6C871),
+                child: const Icon(Icons.add, color: Color(0xFF3B5A7A)),
                 onPressed: () {
                   Navigator.of(context)
                       .push(
@@ -232,7 +417,11 @@ class _HomePageState extends State<HomePage> {
           children: [
             Text(
               'Welcome, $username!',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF3B5A7A),
+              ),
             ),
             const SizedBox(height: 20),
             if (errorMessage != null)
@@ -240,26 +429,45 @@ class _HomePageState extends State<HomePage> {
                 margin: const EdgeInsets.only(bottom: 20),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: const Color(0xFFE6C871).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(
+                    color: const Color(0xFFE6C871).withOpacity(0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.warning_amber_rounded,
-                      color: Colors.orange.shade700,
+                      color: const Color(0xFFE6C871),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         errorMessage!,
-                        style: TextStyle(color: Colors.orange.shade700),
+                        style: const TextStyle(color: Color(0xFFE6C871)),
                       ),
                     ),
                   ],
                 ),
               ),
+
+            // Debug info (remove in production)
+            if (_errorMessage.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Text(
+                  'Debug: $_errorMessage',
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+
             const SizedBox(height: 20),
             Text(
               'Quick Stats',
@@ -270,14 +478,19 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 1.3,
               children: [
                 _buildStatCard(
                   'Properties',
                   _properties.length.toString(),
                   Icons.home,
-                  Colors.blue,
+                  const Color(0xFF3B5A7A),
                 ),
                 _buildStatCard(
                   'Active',
@@ -286,7 +499,28 @@ class _HomePageState extends State<HomePage> {
                       .length
                       .toString(),
                   Icons.check_circle,
-                  Colors.green,
+                  const Color(0xFF3B5A7A),
+                ),
+                _buildStatCard(
+                  'Inactive',
+                  _properties
+                      .where(
+                        (p) =>
+                            p['is_active'] == false || p['not_active'] == true,
+                      )
+                      .length
+                      .toString(),
+                  Icons.cancel,
+                  const Color(0xFF3B5A7A),
+                ),
+                _buildStatCard(
+                  'Total Feedback',
+                  _isLoadingFeedbacks ? '...' : _totalFeedbackCount.toString(),
+                  Icons.feedback,
+                  const Color(0xFF3B5A7A),
+                  onTap: () {
+                    _showFeedbacksDialog();
+                  },
                 ),
               ],
             ),
@@ -297,34 +531,85 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _showFeedbacksDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Feedbacks Overview'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Total Feedbacks: $_totalFeedbackCount'),
+              const SizedBox(height: 10),
+              const Text(
+                'Navigate to individual property details to see specific feedbacks.',
+              ),
+              if (_errorMessage.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Error: $_errorMessage',
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Retry fetching feedbacks
+                _fetchTotalFeedbacksCount();
+                _fetchAllFeedbacks();
+              },
+              child: const Text('Retry'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildStatCard(
     String title,
     String value,
     IconData icon,
-    Color color,
-  ) {
-    return Container(
-      width: 120,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 30),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: color,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 120,
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 30),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-          ),
-          Text(title, style: TextStyle(color: Colors.grey[700], fontSize: 14)),
-        ],
+            Text(
+              title,
+              style: TextStyle(color: Colors.grey[700], fontSize: 14),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -332,7 +617,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildPropertiesTab() {
     if (_isLoadingProperties) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.purple),
+        child: CircularProgressIndicator(color: Color(0xFF3B5A7A)),
       );
     }
 
@@ -362,84 +647,172 @@ class _HomePageState extends State<HomePage> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
       itemCount: _properties.length,
       itemBuilder: (context, index) {
         final property = _properties[index];
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: CircleAvatar(
-              backgroundColor: Colors.purple.shade50,
-              radius: 25,
-              child: Icon(Icons.home_work, color: Colors.purple, size: 30),
-            ),
-            title: Text(
-              property['title'] ?? 'Unnamed Property',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '${property['address'] ?? 'No address'}, ${property['city'] ?? ''}',
-                        style: TextStyle(color: Colors.grey[600]),
+        final screenWidth = MediaQuery.of(context).size.width;
+        final thumbnailSize = screenWidth * 0.12 > 80 ? 80 : screenWidth * 0.12;
+        final padding = screenWidth > 600 ? 24.0 : 20.0;
+        final fontSizeTitle = screenWidth > 600 ? 22.0 : 20.0;
+        final fontSizeSubtitle = screenWidth > 600 ? 16.0 : 14.0;
+
+        return TweenAnimationBuilder(
+          duration: const Duration(milliseconds: 400),
+          tween: Tween<double>(begin: 0, end: 1),
+          curve: Curves.easeOut,
+          builder: (context, opacity, child) {
+            return Opacity(
+              opacity: opacity,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) =>
+                              PropertyDetailsPage(propertyId: property['id']),
+                    ),
+                  );
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  transform: Matrix4.identity()..scale(opacity),
+                  transformAlignment: Alignment.center,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      vertical: padding * 0.4,
+                      horizontal: padding * 0.2,
+                    ),
+                    child: Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.grey[200]!, width: 1),
+                      ),
+                      shadowColor: Colors.grey[300]!.withOpacity(0.3),
+                      child: Padding(
+                        padding: EdgeInsets.all(padding * 0.8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Thumbnail
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: thumbnailSize.toDouble(),
+                                height: thumbnailSize.toDouble(),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  border: Border.all(
+                                    color: Colors.grey[300]!,
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child:
+                                    property['thumbnail'] != null &&
+                                            property['thumbnail'].isNotEmpty
+                                        ? Image.network(
+                                          property['thumbnail'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (
+                                            context,
+                                            error,
+                                            stackTrace,
+                                          ) {
+                                            return Center(
+                                              child: Icon(
+                                                Icons.home_work,
+                                                size: thumbnailSize * 0.5,
+                                                color: Colors.grey[500],
+                                              ),
+                                            );
+                                          },
+                                        )
+                                        : Center(
+                                          child: Icon(
+                                            Icons.home_work,
+                                            size: thumbnailSize * 0.5,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                              ),
+                            ),
+                            SizedBox(width: padding * 0.8),
+                            // Details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    property['title'] ?? 'Unnamed Property',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: fontSizeTitle,
+                                      color: const Color(0xFF2A3F5F),
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: padding * 0.3),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        size: fontSizeSubtitle * 0.9,
+                                        color: Colors.grey[600],
+                                      ),
+                                      SizedBox(width: padding * 0.3),
+                                      Expanded(
+                                        child: Text(
+                                          '${property['address'] ?? 'No address'}, ${property['city'] ?? ''}',
+                                          style: TextStyle(
+                                            fontSize: fontSizeSubtitle * 0.95,
+                                            fontWeight: FontWeight.w400,
+                                            color: Colors.grey[600],
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: padding * 0.3),
+                                  Text(
+                                    property['description'] ??
+                                        'No description available',
+                                    style: TextStyle(
+                                      fontSize: fontSizeSubtitle * 0.9,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.grey[600],
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Trailing Arrow
+                            Padding(
+                              padding: EdgeInsets.only(left: padding * 0.5),
+                              child: Icon(
+                                Icons.arrow_forward_ios,
+                                size: fontSizeSubtitle,
+                                color: const Color(0xFFE6C871),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      property['is_active'] == true
-                          ? Icons.check_circle
-                          : Icons.cancel,
-                      size: 16,
-                      color:
-                          property['is_active'] == true
-                              ? Colors.green
-                              : Colors.red,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      property['is_active'] == true ? 'Active' : 'Inactive',
-                      style: TextStyle(
-                        color:
-                            property['is_active'] == true
-                                ? Colors.green
-                                : Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            trailing: IconButton(
-              icon: Icon(Icons.arrow_forward_ios, color: Colors.grey[400]),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) =>
-                            PropertyDetailsPage(propertyId: property['id']),
                   ),
-                );
-              },
-            ),
-          ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -454,20 +827,24 @@ class _HomePageState extends State<HomePage> {
           children: [
             CircleAvatar(
               radius: 50,
-              backgroundColor: Colors.purple.shade100,
+              backgroundColor: const Color(0xFF3B5A7A).withOpacity(0.1),
               child: Text(
                 username.isNotEmpty ? username[0].toUpperCase() : '?',
                 style: const TextStyle(
                   fontSize: 40,
                   fontWeight: FontWeight.bold,
-                  color: Colors.purple,
+                  color: Color(0xFF3B5A7A),
                 ),
               ),
             ),
             const SizedBox(height: 20),
             Text(
               username,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF3B5A7A),
+              ),
             ),
             const SizedBox(height: 40),
             _buildProfileMenuItem(Icons.settings, 'Settings'),
@@ -478,7 +855,7 @@ class _HomePageState extends State<HomePage> {
             ElevatedButton(
               onPressed: _logout,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: const Color(0xFFE6C871),
                 shape: const StadiumBorder(),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
@@ -487,7 +864,7 @@ class _HomePageState extends State<HomePage> {
               ),
               child: const Text(
                 'Logout',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Color(0xFF3B5A7A)),
               ),
             ),
           ],
@@ -498,9 +875,13 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildProfileMenuItem(IconData icon, String title) {
     return ListTile(
-      leading: Icon(icon, color: Colors.purple),
-      title: Text(title),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      leading: Icon(icon, color: const Color(0xFF3B5A7A)),
+      title: Text(title, style: const TextStyle(color: Color(0xFF3B5A7A))),
+      trailing: const Icon(
+        Icons.arrow_forward_ios,
+        size: 16,
+        color: Color(0xFFE6C871),
+      ),
       onTap: () {
         // Handle menu item tap
       },

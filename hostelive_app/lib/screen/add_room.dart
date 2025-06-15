@@ -1,10 +1,11 @@
 import 'dart:convert';
-
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hostelive_app/constant.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 class AddRoomPage extends StatefulWidget {
   final int propertyId;
@@ -31,12 +32,14 @@ class _AddRoomPageState extends State<AddRoomPage> {
   bool _isAvailable = true;
   bool _isLoading = false;
   String? _errorMessage;
+  File? _selectedImage;
 
   List<Map<String, dynamic>> _facilityOptions = [];
   List<int> _selectedFacilityIds = [];
 
   final _storage = const FlutterSecureStorage();
   final String _baseUrl = '$baseUrl';
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -46,6 +49,33 @@ class _AddRoomPageState extends State<AddRoomPage> {
 
   Future<String?> _getToken() async {
     return await _storage.read(key: 'access_token');
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to pick image: ${e.toString()}';
+      });
+    }
+  }
+
+  void _removeSelectedImage() {
+    setState(() {
+      _selectedImage = null;
+    });
   }
 
   Future<void> _fetchRoomFacilities() async {
@@ -131,7 +161,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Facility added successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFFE6C871),
           ),
         );
       } else if (response.statusCode == 401) {
@@ -164,29 +194,43 @@ class _AddRoomPageState extends State<AddRoomPage> {
         throw Exception('Not authenticated');
       }
 
-      final response = await http.post(
+      var request = http.MultipartRequest(
+        'POST',
         Uri.parse('$_baseUrl/api/listings/rooms/'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'property': widget.propertyId,
-          'room_number': _roomNumberController.text,
-          'room_type': _roomTypeController.text,
-          'capacity': int.parse(_capacityController.text),
-          'rent_per_month': double.parse(_rentController.text),
-          'is_available': _isAvailable,
-          'facilities': _selectedFacilityIds,
-        }),
       );
+
+      request.headers['Authorization'] = 'Bearer $token';
+
+      request.fields['property'] = widget.propertyId.toString();
+      request.fields['room_number'] = _roomNumberController.text;
+      request.fields['room_type'] = _roomTypeController.text;
+      request.fields['capacity'] = _capacityController.text;
+      request.fields['rent_per_month'] = _rentController.text;
+      request.fields['is_available'] = _isAvailable.toString();
+
+      for (int i = 0; i < _selectedFacilityIds.length; i++) {
+        request.fields['facilities[$i]'] = _selectedFacilityIds[i].toString();
+      }
+
+      if (_selectedImage != null) {
+        String fileName = _selectedImage!.path.split('/').last;
+        var multipartFile = await http.MultipartFile.fromPath(
+          'thumbnail',
+          _selectedImage!.path,
+          filename: fileName,
+        );
+        request.files.add(multipartFile);
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 201) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Room added successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFFE6C871),
           ),
         );
         Navigator.pop(context);
@@ -248,7 +292,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
+                          color: Color(0xFF3B5A7A),
                         ),
                       ),
                       TextButton(
@@ -263,7 +307,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.purple,
+                            color: Color(0xFFE6C871),
                           ),
                         ),
                       ),
@@ -288,7 +332,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                         return CheckboxListTile(
                           title: Text(facility['name']),
                           value: isSelected,
-                          activeColor: Colors.purple,
+                          activeColor: Color(0xFFE6C871),
                           onChanged: (bool? value) {
                             setModalState(() {
                               if (value == true) {
@@ -310,7 +354,6 @@ class _AddRoomPageState extends State<AddRoomPage> {
       },
     );
 
-    // Update the main state after modal is closed
     setState(() {
       _selectedFacilityIds = tempSelectedIds;
     });
@@ -339,7 +382,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Room'),
-        backgroundColor: Colors.purple,
+        backgroundColor: Color(0xFF3B5A7A),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -355,14 +398,17 @@ class _AddRoomPageState extends State<AddRoomPage> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Colors.purple.shade300, Colors.purple.shade600],
+                      colors: [
+                        Color(0xFF3B5A7A).withOpacity(0.7),
+                        Color(0xFF3B5A7A),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.purple.withOpacity(0.3),
+                        color: Color(0xFF3B5A7A).withOpacity(0.3),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -399,7 +445,91 @@ class _AddRoomPageState extends State<AddRoomPage> {
 
                 const Text(
                   'Room Details',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3B5A7A),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Room Image Section
+                const Text(
+                  'Room Image',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF3B5A7A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Color(0xFF3B5A7A).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Color(0xFF3B5A7A).withOpacity(0.3),
+                      width: 2,
+                      style: BorderStyle.solid,
+                    ),
+                  ),
+                  child:
+                      _selectedImage != null
+                          ? Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.file(
+                                  _selectedImage!,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: _removeSelectedImage,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFE6C871),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Color(0xFF3B5A7A),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                          : InkWell(
+                            onTap: _pickImageFromGallery,
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_photo_alternate,
+                                  size: 50,
+                                  color: Color(0xFF3B5A7A),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Tap to select room image from gallery',
+                                  style: TextStyle(
+                                    color: Color(0xFF3B5A7A),
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                 ),
                 const SizedBox(height: 20),
 
@@ -413,9 +543,12 @@ class _AddRoomPageState extends State<AddRoomPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
-                    prefixIcon: const Icon(Icons.meeting_room),
+                    prefixIcon: const Icon(
+                      Icons.meeting_room,
+                      color: Color(0xFF3B5A7A),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -436,9 +569,12 @@ class _AddRoomPageState extends State<AddRoomPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
-                    prefixIcon: const Icon(Icons.category),
+                    prefixIcon: const Icon(
+                      Icons.category,
+                      color: Color(0xFF3B5A7A),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -459,9 +595,12 @@ class _AddRoomPageState extends State<AddRoomPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
-                    prefixIcon: const Icon(Icons.people),
+                    prefixIcon: const Icon(
+                      Icons.people,
+                      color: Color(0xFF3B5A7A),
+                    ),
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -487,9 +626,12 @@ class _AddRoomPageState extends State<AddRoomPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
-                    prefixIcon: const Icon(Icons.attach_money),
+                    prefixIcon: const Icon(
+                      Icons.attach_money,
+                      color: Color(0xFF3B5A7A),
+                    ),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -515,7 +657,11 @@ class _AddRoomPageState extends State<AddRoomPage> {
                 // Facilities Dropdown
                 const Text(
                   'Room Facilities',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF3B5A7A),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 InkWell(
@@ -523,14 +669,14 @@ class _AddRoomPageState extends State<AddRoomPage> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
+                      color: Color(0xFF3B5A7A).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: Row(
                       children: [
                         const Icon(
                           Icons.home_repair_service_outlined,
-                          color: Colors.purple,
+                          color: Color(0xFF3B5A7A),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -545,7 +691,10 @@ class _AddRoomPageState extends State<AddRoomPage> {
                             ),
                           ),
                         ),
-                        const Icon(Icons.arrow_drop_down, color: Colors.purple),
+                        const Icon(
+                          Icons.arrow_drop_down,
+                          color: Color(0xFF3B5A7A),
+                        ),
                       ],
                     ),
                   ),
@@ -555,7 +704,11 @@ class _AddRoomPageState extends State<AddRoomPage> {
                 // Add New Facility
                 const Text(
                   'Add New Facility',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF3B5A7A),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -570,7 +723,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                             borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide.none,
                           ),
-                          fillColor: Colors.purple.withOpacity(0.1),
+                          fillColor: Color(0xFF3B5A7A).withOpacity(0.1),
                           filled: true,
                         ),
                       ),
@@ -579,7 +732,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                     ElevatedButton(
                       onPressed: _addNewFacility,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
+                        backgroundColor: Color(0xFFE6C871),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
@@ -587,7 +740,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                       ),
                       child: const Text(
                         'Add',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: Color(0xFF3B5A7A)),
                       ),
                     ),
                   ],
@@ -596,10 +749,16 @@ class _AddRoomPageState extends State<AddRoomPage> {
 
                 // Availability Switch
                 SwitchListTile(
-                  title: const Text('Room Status'),
-                  subtitle: Text(_isAvailable ? 'Available' : 'Not Available'),
+                  title: const Text(
+                    'Room Status',
+                    style: TextStyle(color: Color(0xFF3B5A7A)),
+                  ),
+                  subtitle: Text(
+                    _isAvailable ? 'Available' : 'Not Available',
+                    style: TextStyle(color: Color(0xFF3B5A7A)),
+                  ),
                   value: _isAvailable,
-                  activeColor: Colors.purple,
+                  activeColor: Color(0xFFE6C871),
                   onChanged: (bool value) {
                     setState(() {
                       _isAvailable = value;
@@ -613,19 +772,21 @@ class _AddRoomPageState extends State<AddRoomPage> {
                     margin: const EdgeInsets.only(top: 16),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: Color(0xFFE6C871).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
+                      border: Border.all(
+                        color: Color(0xFFE6C871).withOpacity(0.3),
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700),
+                        Icon(Icons.error_outline, color: Color(0xFFE6C871)),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: TextStyle(color: Colors.red.shade700),
+                            style: TextStyle(color: Color(0xFFE6C871)),
                           ),
                         ),
                       ],
@@ -642,8 +803,10 @@ class _AddRoomPageState extends State<AddRoomPage> {
                     style: ElevatedButton.styleFrom(
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.purple,
-                      disabledBackgroundColor: Colors.purple.withOpacity(0.5),
+                      backgroundColor: Color(0xFFE6C871),
+                      disabledBackgroundColor: Color(
+                        0xFFE6C871,
+                      ).withOpacity(0.5),
                     ),
                     child:
                         _isLoading
@@ -651,7 +814,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
+                                color: Color(0xFF3B5A7A),
                                 strokeWidth: 2,
                               ),
                             )
@@ -659,7 +822,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
                               "Save Room",
                               style: TextStyle(
                                 fontSize: 18,
-                                color: Colors.white,
+                                color: Color(0xFF3B5A7A),
                               ),
                             ),
                   ),

@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hostelive_app/constant.dart';
 import 'package:http/http.dart' as http;
 import 'package:multi_select_flutter/multi_select_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AddPropertyPage extends StatefulWidget {
   const AddPropertyPage({super.key});
@@ -26,12 +28,14 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
   bool _isActive = true;
   bool _isLoading = false;
   String? _errorMessage;
+  File? _selectedImage;
 
   List<Map<String, dynamic>> _propertyTypes = [];
   List<Map<String, dynamic>> _facilityOptions = [];
 
   final _storage = const FlutterSecureStorage();
   final String _baseUrl = '$baseUrl';
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -42,6 +46,33 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
 
   Future<String?> _getToken() async {
     return await _storage.read(key: 'access_token');
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to pick image: ${e.toString()}';
+      });
+    }
+  }
+
+  void _removeSelectedImage() {
+    setState(() {
+      _selectedImage = null;
+    });
   }
 
   Future<void> _fetchPropertyTypes() async {
@@ -232,29 +263,44 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
               .map((facility) => facility['id'] as int)
               .toList();
 
-      final response = await http.post(
+      var request = http.MultipartRequest(
+        'POST',
         Uri.parse('$_baseUrl/api/listings/properties/'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'type': _propertyType,
-          'title': _titleController.text,
-          'address': _addressController.text,
-          'city': _cityController.text,
-          'shared_facilities': selectedFacilities,
-          'description': _descriptionController.text,
-          'is_active': _isActive,
-        }),
       );
+
+      request.headers['Authorization'] = 'Bearer $token';
+
+      request.fields['type'] = _propertyType.toString();
+      request.fields['title'] = _titleController.text;
+      request.fields['address'] = _addressController.text;
+      request.fields['city'] = _cityController.text;
+      request.fields['description'] = _descriptionController.text;
+      request.fields['is_active'] = _isActive.toString();
+
+      for (int i = 0; i < selectedFacilities.length; i++) {
+        request.fields['shared_facilities[$i]'] =
+            selectedFacilities[i].toString();
+      }
+
+      if (_selectedImage != null) {
+        String fileName = _selectedImage!.path.split('/').last;
+        var multipartFile = await http.MultipartFile.fromPath(
+          'thumbnail',
+          _selectedImage!.path,
+          filename: fileName,
+        );
+        request.files.add(multipartFile);
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 201) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Property added successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFFE6C871),
           ),
         );
         Navigator.pop(context);
@@ -295,7 +341,7 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Property'),
-        backgroundColor: Colors.purple,
+        backgroundColor: const Color(0xFF3B5A7A),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -307,21 +353,108 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
               children: [
                 const Text(
                   'Property Details',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3B5A7A),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Property Image Section
+                const Text(
+                  'Property Image',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF3B5A7A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B5A7A).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFF3B5A7A).withOpacity(0.3),
+                      width: 2,
+                      style: BorderStyle.solid,
+                    ),
+                  ),
+                  child:
+                      _selectedImage != null
+                          ? Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.file(
+                                  _selectedImage!,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: _removeSelectedImage,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFE6C871),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Color(0xFF3B5A7A),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                          : InkWell(
+                            onTap: _pickImageFromGallery,
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_photo_alternate,
+                                  size: 50,
+                                  color: Color(0xFF3B5A7A),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Tap to select image from gallery',
+                                  style: TextStyle(
+                                    color: Color(0xFF3B5A7A),
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                 ),
                 const SizedBox(height: 20),
 
                 // Property Type
                 const Text(
                   'Property Type',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3B5A7A),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
                   value: _propertyType,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
@@ -362,7 +495,7 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                             borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide.none,
                           ),
-                          fillColor: Colors.purple.withOpacity(0.1),
+                          fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                           filled: true,
                         ),
                       ),
@@ -371,11 +504,11 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                     ElevatedButton(
                       onPressed: _addNewType,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
+                        backgroundColor: const Color(0xFFE6C871),
                       ),
                       child: const Text(
                         'Add',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: Color(0xFF3B5A7A)),
                       ),
                     ),
                   ],
@@ -392,9 +525,12 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
-                    prefixIcon: const Icon(Icons.title),
+                    prefixIcon: const Icon(
+                      Icons.title,
+                      color: Color(0xFF3B5A7A),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -415,9 +551,12 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
-                    prefixIcon: const Icon(Icons.location_on),
+                    prefixIcon: const Icon(
+                      Icons.location_on,
+                      color: Color(0xFF3B5A7A),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -438,9 +577,12 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
-                    prefixIcon: const Icon(Icons.location_city),
+                    prefixIcon: const Icon(
+                      Icons.location_city,
+                      color: Color(0xFF3B5A7A),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -454,7 +596,11 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                 // Facilities
                 const Text(
                   'Facilities',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF3B5A7A),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 MultiSelectDialogField(
@@ -468,26 +614,24 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                           )
                           .toList(),
                   title: const Text('Select Facilities'),
-                  selectedColor: Colors.purple,
+                  selectedColor: const Color(0xFF3B5A7A),
                   decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.1),
+                    color: const Color(0xFF3B5A7A).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   buttonText: const Text(
                     'Select Facilities',
-                    style: TextStyle(color: Colors.purple),
+                    style: TextStyle(color: Color(0xFF3B5A7A)),
                   ),
                   buttonIcon: const Icon(
                     Icons.arrow_drop_down,
-                    color: Colors.purple,
+                    color: Color(0xFF3B5A7A),
                   ),
                   onConfirm: (selected) {
                     setState(() {
-                      // Reset all facilities to unselected
                       for (var facility in _facilityOptions) {
                         facility['selected'] = false;
                       }
-                      // Mark selected facilities
                       for (var selectedFacility
                           in selected.cast<Map<String, dynamic>>()) {
                         var facility = _facilityOptions.firstWhere(
@@ -498,8 +642,8 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                     });
                   },
                   chipDisplay: MultiSelectChipDisplay(
-                    chipColor: Colors.purple.withOpacity(0.2),
-                    textStyle: const TextStyle(color: Colors.purple),
+                    chipColor: const Color(0xFF3B5A7A).withOpacity(0.2),
+                    textStyle: const TextStyle(color: Color(0xFF3B5A7A)),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -515,7 +659,7 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                             borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide.none,
                           ),
-                          fillColor: Colors.purple.withOpacity(0.1),
+                          fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                           filled: true,
                         ),
                       ),
@@ -524,11 +668,11 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                     ElevatedButton(
                       onPressed: _addNewFacility,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
+                        backgroundColor: const Color(0xFFE6C871),
                       ),
                       child: const Text(
                         'Add',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: Color(0xFF3B5A7A)),
                       ),
                     ),
                   ],
@@ -545,7 +689,7 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.purple.withOpacity(0.1),
+                    fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                     filled: true,
                     alignLabelWithHint: true,
                   ),
@@ -561,10 +705,16 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
 
                 // Status Switch
                 SwitchListTile(
-                  title: const Text('Property Status'),
-                  subtitle: Text(_isActive ? 'Active' : 'Inactive'),
+                  title: const Text(
+                    'Property Status',
+                    style: TextStyle(color: Color(0xFF3B5A7A)),
+                  ),
+                  subtitle: Text(
+                    _isActive ? 'Active' : 'Inactive',
+                    style: TextStyle(color: Color(0xFF3B5A7A)),
+                  ),
                   value: _isActive,
-                  activeColor: Colors.purple,
+                  activeColor: const Color(0xFFE6C871),
                   onChanged: (bool value) {
                     setState(() {
                       _isActive = value;
@@ -578,19 +728,24 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                     margin: const EdgeInsets.only(top: 16),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: const Color(0xFFE6C871).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
+                      border: Border.all(
+                        color: const Color(0xFFE6C871).withOpacity(0.3),
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700),
+                        Icon(
+                          Icons.error_outline,
+                          color: const Color(0xFFE6C871),
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: TextStyle(color: Colors.red.shade700),
+                            style: const TextStyle(color: Color(0xFFE6C871)),
                           ),
                         ),
                       ],
@@ -607,8 +762,10 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                     style: ElevatedButton.styleFrom(
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.purple,
-                      disabledBackgroundColor: Colors.purple.withOpacity(0.5),
+                      backgroundColor: const Color(0xFFE6C871),
+                      disabledBackgroundColor: const Color(
+                        0xFFE6C871,
+                      ).withOpacity(0.5),
                     ),
                     child:
                         _isLoading
@@ -616,7 +773,7 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
+                                color: Color(0xFF3B5A7A),
                                 strokeWidth: 2,
                               ),
                             )
@@ -624,7 +781,7 @@ class _AddPropertyPageState extends State<AddPropertyPage> {
                               "Save Property",
                               style: TextStyle(
                                 fontSize: 18,
-                                color: Colors.white,
+                                color: Color(0xFF3B5A7A),
                               ),
                             ),
                   ),

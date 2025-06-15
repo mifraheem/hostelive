@@ -51,7 +51,6 @@ class _SignupPageState extends State<SignupPage> {
           )
           .timeout(const Duration(seconds: 15));
 
-      // Try to parse the response body
       final Map<String, dynamic> responseData;
       try {
         responseData = json.decode(response.body);
@@ -60,22 +59,18 @@ class _SignupPageState extends State<SignupPage> {
       }
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        // Registration successful
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Registration successful!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFFE6C871),
           ),
         );
 
-        // Navigate to login page
         Navigator.pushNamed(context, '/login');
       } else if (response.statusCode == 400) {
-        // Handle validation errors specifically
         setState(() {
-          // Process field-specific errors
           responseData.forEach((key, value) {
             if (value is List) {
               _fieldErrors[key] = List<String>.from(value);
@@ -84,7 +79,6 @@ class _SignupPageState extends State<SignupPage> {
             }
           });
 
-          // Set a general error message based on field errors
           if (_fieldErrors.containsKey('username') &&
               _fieldErrors.containsKey('email')) {
             _errorMessage = 'Both username and email are already taken.';
@@ -97,7 +91,6 @@ class _SignupPageState extends State<SignupPage> {
           }
         });
       } else {
-        // Handle other error statuses
         setState(() {
           _errorMessage =
               responseData['message'] ??
@@ -130,11 +123,7 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign Up'),
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.purple,
-      ),
+      backgroundColor: const Color.fromARGB(255, 224, 236, 251),
       body: SingleChildScrollView(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -149,11 +138,14 @@ class _SignupPageState extends State<SignupPage> {
                 Column(
                   children: <Widget>[
                     const SizedBox(height: 20.0),
+                    Image.asset('assets/logo.png', height: 200, width: 200),
+                    const SizedBox(height: 20.0),
                     const Text(
                       "Sign up",
                       style: TextStyle(
                         fontSize: 30,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF3B5A7A),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -165,7 +157,6 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 Column(
                   children: <Widget>[
-                    // Username field
                     TextFormField(
                       controller: _usernameController,
                       decoration: InputDecoration(
@@ -177,14 +168,14 @@ class _SignupPageState extends State<SignupPage> {
                         fillColor:
                             _fieldErrors['username'] != null
                                 ? Colors.red.withOpacity(0.1)
-                                : Colors.purple.withOpacity(0.1),
+                                : const Color(0xFF3B5A7A).withOpacity(0.1),
                         filled: true,
                         prefixIcon: Icon(
                           Icons.person,
                           color:
                               _fieldErrors['username'] != null
                                   ? Colors.red
-                                  : null,
+                                  : const Color(0xFF3B5A7A),
                         ),
                       ),
                       validator: (value) {
@@ -209,7 +200,6 @@ class _SignupPageState extends State<SignupPage> {
 
                     const SizedBox(height: 20),
 
-                    // Email field
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -222,12 +212,14 @@ class _SignupPageState extends State<SignupPage> {
                         fillColor:
                             _fieldErrors['email'] != null
                                 ? Colors.red.withOpacity(0.1)
-                                : Colors.purple.withOpacity(0.1),
+                                : const Color(0xFF3B5A7A).withOpacity(0.1),
                         filled: true,
                         prefixIcon: Icon(
                           Icons.email,
                           color:
-                              _fieldErrors['email'] != null ? Colors.red : null,
+                              _fieldErrors['email'] != null
+                                  ? Colors.red
+                                  : const Color(0xFF3B5A7A),
                         ),
                       ),
                       validator: (value) {
@@ -269,14 +261,14 @@ class _SignupPageState extends State<SignupPage> {
                         fillColor:
                             _fieldErrors['password'] != null
                                 ? Colors.red.withOpacity(0.1)
-                                : Colors.purple.withOpacity(0.1),
+                                : const Color(0xFF3B5A7A).withOpacity(0.1),
                         filled: true,
                         prefixIcon: Icon(
                           Icons.password,
                           color:
                               _fieldErrors['password'] != null
                                   ? Colors.red
-                                  : null,
+                                  : const Color(0xFF3B5A7A),
                         ),
                       ),
                       obscureText: true,
@@ -314,9 +306,12 @@ class _SignupPageState extends State<SignupPage> {
                           borderRadius: BorderRadius.circular(18),
                           borderSide: BorderSide.none,
                         ),
-                        fillColor: Colors.purple.withOpacity(0.1),
+                        fillColor: const Color(0xFF3B5A7A).withOpacity(0.1),
                         filled: true,
-                        prefixIcon: const Icon(Icons.password),
+                        prefixIcon: const Icon(
+                          Icons.password,
+                          color: Color(0xFF3B5A7A),
+                        ),
                       ),
                       obscureText: true,
                       validator: (value) {
@@ -364,8 +359,10 @@ class _SignupPageState extends State<SignupPage> {
                     style: ElevatedButton.styleFrom(
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.purple,
-                      disabledBackgroundColor: Colors.purple.withOpacity(0.5),
+                      backgroundColor: const Color(0xFFE6C871),
+                      disabledBackgroundColor: const Color(
+                        0xFFE6C871,
+                      ).withOpacity(0.5),
                     ),
                     child:
                         _isLoading
@@ -381,7 +378,7 @@ class _SignupPageState extends State<SignupPage> {
                               "Sign up",
                               style: TextStyle(
                                 fontSize: 20,
-                                color: Colors.white,
+                                color: Color(0xFF3B5A7A),
                               ),
                             ),
                   ),
@@ -397,7 +394,10 @@ class _SignupPageState extends State<SignupPage> {
                       },
                       child: const Text(
                         "Login",
-                        style: TextStyle(color: Colors.purple),
+                        style: TextStyle(
+                          color: Color(0xFFE6C871),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],

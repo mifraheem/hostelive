@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hostelive_app/screen/home_screen.dart';
 import 'package:hostelive_app/screen/login_screen.dart';
 import 'package:hostelive_app/screen/signup_page.dart';
+import 'package:hostelive_app/screen/student_dashboard.dart';
 
 void main() {
   runApp(const MyApp());
@@ -42,9 +43,11 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(primarySwatch: Colors.purple),
       initialRoute: _initialRoute,
       routes: {
-        '/login': (context) => const LoginPage(),
+        '/login': (context) => LoginPage(),
         '/signup': (context) => const SignupPage(),
         '/home': (context) => const HomePage(),
+        '/student-dashboard': (context) => StudentDashboard(),
+        //'/property-detail': (context) => PropertyDetailPage(property: {}),
       },
     );
   }

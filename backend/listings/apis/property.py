@@ -13,11 +13,16 @@ from ..models import Property
 from ..serializers.property import PropertySerializer
 from ..permissions import IsOwnerOrReadOnly
 from drf_yasg.utils import swagger_auto_schema
+from ..filters import PropertyFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
 class PropertyViewSet(viewsets.ModelViewSet):
     serializer_class = PropertySerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     parser_classes = [MultiPartParser, FormParser]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = PropertyFilter
+
 
     def get_queryset(self):
         return Property.objects.all().order_by('-created_at')

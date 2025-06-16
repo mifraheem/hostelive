@@ -19,13 +19,17 @@ class PropertySerializer(serializers.ModelSerializer):
     class Meta:
         model = Property
         fields = [
-            'id', 'type', 'title', 'address', 'city', 'description',
+            'id', 'type', 'type_name' ,'title', 'address', 'city', 'description',
             'shared_facilities',       
             'shared_facilities_detail',
             'thumbnail', 'thumbnail_url',
             'is_active', 'created_at'
         ]
         read_only_fields = ['id', 'owner', 'created_at']
+
+    type_name = serializers.SerializerMethodField()
+    def get_type_name(self, obj):
+        return obj.type.name if obj.type else None
 
     def get_thumbnail_url(self, obj):
         request = self.context.get('request')

@@ -16,11 +16,12 @@ class RoomSerializer(serializers.ModelSerializer):
     )
     thumbnail = serializers.ImageField(required=False, allow_null=True)
     thumbnail_url = serializers.SerializerMethodField()
+    property_title = serializers.CharField(source='property.title', read_only=True)
 
     class Meta:
         model = Room
         fields = [
-            'id', 'property', 'room_number', 'room_type', 'capacity',
+            'id', 'property','property_title', 'room_number', 'room_type', 'capacity',
             'rent_per_month', 'is_available',
             'facilities', 'facilities_detail',
             'thumbnail', 'thumbnail_url',

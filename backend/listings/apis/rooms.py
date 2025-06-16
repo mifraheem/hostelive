@@ -4,13 +4,18 @@ from ..serializers.room import RoomSerializer
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from ..filters import RoomFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
 class RoomViewSet(viewsets.ModelViewSet):
     queryset = Room.objects.all().order_by('-id')
     serializer_class = RoomSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    parser_classes = [MultiPartParser, FormParser] 
+    parser_classes = [MultiPartParser, FormParser, JSONParser] 
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = RoomFilter
+
 
     def perform_create(self, serializer):
         property_obj = serializer.validated_data['property']

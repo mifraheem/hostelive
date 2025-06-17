@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hostelive_app/constant.dart';
 import 'package:hostelive_app/screen/add_room.dart';
 import 'package:hostelive_app/screen/room_list.dart';
 import 'package:http/http.dart' as http;
@@ -21,7 +22,7 @@ class _PropertyDetailsPageState extends State<PropertyDetailsPage> {
   bool _isFeedbackLoading = false;
   String? _errorMessage;
   final _storage = const FlutterSecureStorage();
-  final String _baseUrl = 'http://10.0.2.2:8000';
+  // final String _baseUrl = 'http://10.0.2.2:8000';
   final GlobalKey<RoomsListWidgetState> _roomsListKey =
       GlobalKey<RoomsListWidgetState>();
   Map<int, String> _propertyTypes = {};
@@ -55,7 +56,7 @@ class _PropertyDetailsPageState extends State<PropertyDetailsPage> {
       if (token == null) return;
 
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/listings/types/'),
+        Uri.parse('$baseUrl/api/listings/types/'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -93,7 +94,7 @@ class _PropertyDetailsPageState extends State<PropertyDetailsPage> {
       if (token == null) throw Exception('Not authenticated');
 
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/listings/properties/${widget.propertyId}/'),
+        Uri.parse('$baseUrl/api/listings/properties/${widget.propertyId}/'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -134,7 +135,7 @@ class _PropertyDetailsPageState extends State<PropertyDetailsPage> {
 
       final response = await http.get(
         Uri.parse(
-          '$_baseUrl/api/listings/feedbacks/property/${widget.propertyId}/',
+          '$baseUrl/api/listings/feedbacks/property/${widget.propertyId}/',
         ),
         headers: {
           'Authorization': 'Bearer $token',
@@ -171,7 +172,7 @@ class _PropertyDetailsPageState extends State<PropertyDetailsPage> {
       if (token == null) throw Exception('Not authenticated');
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/api/listings/feedbacks/'),
+        Uri.parse('$baseUrl/api/listings/feedbacks/'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -314,7 +315,7 @@ class _PropertyDetailsPageState extends State<PropertyDetailsPage> {
       if (token == null) throw Exception('Not authenticated');
 
       final response = await http.patch(
-        Uri.parse('$_baseUrl/api/listings/properties/${widget.propertyId}/'),
+        Uri.parse('$baseUrl/api/listings/properties/${widget.propertyId}/'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',

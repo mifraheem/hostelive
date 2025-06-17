@@ -103,7 +103,7 @@ class _HomePageState extends State<HomePage> {
       String? token = await _storage.read(key: 'access_token');
       if (token != null) {
         final response = await http.get(
-          Uri.parse('$baseUrl/api/listings/properties/'),
+          Uri.parse('$baseUrl/api/listings/properties/mylistings'),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',

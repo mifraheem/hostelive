@@ -56,6 +56,15 @@ class Room(models.Model):
 
     def __str__(self):
         return f"{self.property.title} - Room {self.room_number}"
+class RoomImage(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='room_images/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image for {self.room}"
+
+
 
 
 class Feedback(models.Model):

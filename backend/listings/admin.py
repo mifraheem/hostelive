@@ -5,7 +5,8 @@ from .models import (
     Property,
     RoomFacility,
     Room,
-    Feedback
+    Feedback,
+    RoomImage
 )
 
 @admin.register(ListingType)
@@ -24,9 +25,13 @@ class PropertyAdmin(admin.ModelAdmin):
 class RoomFacilityAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
 
+class RoomImageInline(admin.TabularInline):
+    model = RoomImage
+    extra = 1
 @admin.register(Room)
 class RoomAdmin(admin.ModelAdmin):
     list_display = ('id', 'property', 'room_number', 'room_type', 'capacity', 'rent_per_month', 'is_available', 'created_at')
+    inlines = [RoomImageInline]
 
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):

@@ -18,7 +18,8 @@ class PropertyFilter(filters.FilterSet):
     def filter_by_city_or_address(self, queryset, name, value):
         return queryset.filter(
             models.Q(city__icontains=value) |
-            models.Q(address__icontains=value)
+            models.Q(address__icontains=value) |
+            models.Q(title__icontains=value) 
         )
 
 

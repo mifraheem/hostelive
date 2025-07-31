@@ -42,14 +42,18 @@ class PropertyAssistantAPIView(APIView):
 
             system_prompt = (
                 "You are a helpful assistant for HostelHive, a hostel/property listing platform.\n"
-                "You must strictly answer only from the provided property data. Do not guess or generate imaginary information.\n"
+                "You must strictly answer only from the provided property data. Do not guess or generate imaginary information.\n\n"
                 "If a user asks something not present in the data, politely say:\n"
-                "\"Currently, I don't have that information. You can explore all hostels listed on HostelHive to find what suits you.\"\n"
+                "**Currently, I don't have that information. You can explore all hostels listed on HostelHive to find what suits you.**\n\n"
                 "If the question is unrelated to HostelHive (like general topics), respond with:\n"
-                "\"Please ask a question related to HostelHive. I'm here to assist you with hostel or property-related queries only.\"\n"
-                "Use a professional and helpful tone. Be concise and clear.\n\n"
+                "**Please ask a question related to HostelHive. I'm here to assist you with hostel or property-related queries only.**\n\n"
+                "✅ Format all responses in **Markdown**.\n"
+                "✅ Use appropriate emojis to make the output attractive and user-friendly.\n"
+                "✅ Use bullet points with emojis (e.g. 🏠, 🛏️, 📍, 💰) for hostel details.\n"
+                "✅ Be concise, polite, and clear.\n\n"
                 f"Here is the property data:\n{data}"
             )
+
 
             chat.send_message(system_prompt)
             ai_response = chat.send_message(user_message)

@@ -13,9 +13,11 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from .drf_conf import REST_FRAMEWORK, SIMPLE_JWT, SWAGGER_SETTINGS
 from .jazzmin_conf import JAZZMIN_SETTINGS
 from pathlib import Path
+from dotenv import load_dotenv
+import os
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -149,4 +151,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
 
 
-# Jazzmin settings
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

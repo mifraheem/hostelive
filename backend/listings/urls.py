@@ -10,6 +10,7 @@ from .apis.rooms import RoomViewSet
 from .apis.feedback import FeedbackViewSet
 from rest_framework.routers import DefaultRouter
 from .apis.agentData import agent_knowledge_view
+from .apis.agent import PropertyAssistantAPIView
 
 router = DefaultRouter()
 router.register(r'properties', PropertyViewSet, basename='property')
@@ -22,5 +23,6 @@ urlpatterns = [
     path('room-facilities/', RoomFacilityListCreateView.as_view(), name='room-facilities'),
     path('shared-facilities/', SharedFacilityListCreateView.as_view(), name='shared-facilities'),
     path('agent/data/', agent_knowledge_view),
+     path('ai-assistant/', PropertyAssistantAPIView.as_view(), name='ai-assistant'),
 ]
 urlpatterns += router.urls
